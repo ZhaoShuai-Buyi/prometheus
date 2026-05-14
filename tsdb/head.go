@@ -421,7 +421,7 @@ type headMetrics struct {
 	snapshotReplayErrorTotal  prometheus.Counter // Will be either 0 or 1.
 	oooHistogram              prometheus.Histogram
 	mmapChunksTotal           prometheus.Counter
-	headChunksMaxPendingMmap  prometheus.Gauge
+	headChunksMaxMmapped      prometheus.Gauge
 	walReplayUnknownRefsTotal *prometheus.CounterVec
 	wblReplayUnknownRefsTotal *prometheus.CounterVec
 }
@@ -561,9 +561,9 @@ func newHeadMetrics(h *Head, r prometheus.Registerer) *headMetrics {
 			Name: "prometheus_tsdb_mmap_chunks_total",
 			Help: "Total number of chunks that were memory-mapped.",
 		}),
-		headChunksMaxPendingMmap: prometheus.NewGauge(prometheus.GaugeOpts{
-			Name: "prometheus_tsdb_head_chunks_max_pending_mmap",
-			Help: "Maximum number of head chunks pending m-mapping observed in any individual series during the last m-map pass.",
+		headChunksMaxMmapped: prometheus.NewGauge(prometheus.GaugeOpts{
+			Name: "prometheus_tsdb_head_chunks_max_mmapped",
+			Help: "Maximum number of head chunks memory-mapped for any individual series during the last memory-mapping pass.",
 		}),
 		walReplayUnknownRefsTotal: prometheus.NewCounterVec(prometheus.CounterOpts{
 			Name: "prometheus_tsdb_wal_replay_unknown_refs_total",
@@ -603,7 +603,7 @@ func newHeadMetrics(h *Head, r prometheus.Registerer) *headMetrics {
 			m.checkpointCreationTotal,
 			m.oooHistogram,
 			m.mmapChunksTotal,
-			m.headChunksMaxPendingMmap,
+			m.headChunksMaxMmapped,
 			m.mmapChunkCorruptionTotal,
 			m.snapshotReplayErrorTotal,
 			// Metrics bound to functions and not needed in tests
@@ -1950,26 +1950,25 @@ func (h *Head) getOrCreateWithOptionalID(id chunks.HeadSeriesRef, hash uint64, l
 // M-mapping is serialised via the per-series lock and done away from the sample append path,
 // since holding the lock during an append could delay the next scrape or cause query timeouts.
 func (h *Head) mmapHeadChunks() {
-	var count int
-	var maxPendingMmapChunks uint32
+	var count, maxMmappedChunks int
 	for i := range h.series.size {
 		h.series.locks[i].RLock()
 		for _, series := range h.series.series[i] {
-			hcc := series.headChunkCount.Load()
-			if hcc < 2 { // < 2 means 0 or 1 head chunks, nothing to mmap.
+			if series.headChunkCount.Load() < 2 { // < 2 means 0 or 1 head chunks, nothing to mmap.
 				continue
-			}
-			if hcc > maxPendingMmapChunks {
-				maxPendingMmapChunks = hcc
 			}
 
 			series.Lock()
-			count += series.mmapChunks(h.chunkDiskMapper)
+			mmapped := series.mmapChunks(h.chunkDiskMapper)
 			series.Unlock()
+			count += mmapped
+			if mmapped > maxMmappedChunks {
+				maxMmappedChunks = mmapped
+			}
 		}
 		h.series.locks[i].RUnlock()
 	}
-	h.metrics.headChunksMaxPendingMmap.Set(float64(maxPendingMmapChunks))
+	h.metrics.headChunksMaxMmapped.Set(float64(maxMmappedChunks))
 	h.metrics.mmapChunksTotal.Add(float64(count))
 }
 
