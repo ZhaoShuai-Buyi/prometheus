@@ -23,7 +23,6 @@ import (
 	"math"
 	"net"
 	"net/http"
-	"net/http/pprof"
 	"net/url"
 	"os"
 	"path"
@@ -471,9 +470,6 @@ func New(logger log.Logger, o *Options) *Handler {
 		w.Write([]byte("Only POST or PUT requests allowed"))
 	})
 
-	router.Get("/debug/*subpath", serveDebug)
-	router.Post("/debug/*subpath", serveDebug)
-
 	router.Get("/-/healthy", func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)
 		fmt.Fprintf(w, o.AppName+" is Healthy.\n")
@@ -490,36 +486,6 @@ func New(logger log.Logger, o *Options) *Handler {
 	}))
 
 	return h
-}
-
-func serveDebug(w http.ResponseWriter, req *http.Request) {
-	ctx := req.Context()
-	subpath := route.Param(ctx, "subpath")
-
-	if subpath == "/pprof" {
-		http.Redirect(w, req, req.URL.Path+"/", http.StatusMovedPermanently)
-		return
-	}
-
-	if !strings.HasPrefix(subpath, "/pprof/") {
-		http.NotFound(w, req)
-		return
-	}
-	subpath = strings.TrimPrefix(subpath, "/pprof/")
-
-	switch subpath {
-	case "cmdline":
-		pprof.Cmdline(w, req)
-	case "profile":
-		pprof.Profile(w, req)
-	case "symbol":
-		pprof.Symbol(w, req)
-	case "trace":
-		pprof.Trace(w, req)
-	default:
-		req.URL.Path = "/debug/pprof/" + subpath
-		pprof.Index(w, req)
-	}
 }
 
 // SetReady sets the ready status of our web Handler

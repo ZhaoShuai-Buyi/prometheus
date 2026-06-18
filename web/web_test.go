@@ -289,11 +289,11 @@ func TestDebugHandler(t *testing.T) {
 		prefix, url string
 		code        int
 	}{
-		{"/", "/debug/pprof/cmdline", 200},
-		{"/foo", "/foo/debug/pprof/cmdline", 200},
+		{"/", "/debug/pprof/cmdline", 404},
+		{"/foo", "/foo/debug/pprof/cmdline", 404},
 
-		{"/", "/debug/pprof/goroutine", 200},
-		{"/foo", "/foo/debug/pprof/goroutine", 200},
+		{"/", "/debug/pprof/goroutine", 404},
+		{"/foo", "/foo/debug/pprof/goroutine", 404},
 
 		{"/", "/debug/pprof/foo", 404},
 		{"/foo", "/bar/debug/pprof/goroutine", 404},

@@ -26,6 +26,13 @@ npm_licenses.tar.bz2
 
 /vendor
 /.build
+/.cache
+/.tmp
+/.appdata
+/dist
+/web/ui/embed.go
+/web/ui/module/lezer-promql/dist
+/web/ui/module/codemirror-promql/dist
 
 /**/node_modules
 
