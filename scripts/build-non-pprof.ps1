@@ -36,7 +36,12 @@ try {
     $env:CGO_ENABLED = "0"
 
     if (-not $Version) {
-        $Version = (Get-Content VERSION -TotalCount 1).Trim()
+        $baseVersion = (Get-Content VERSION -TotalCount 1).Trim()
+        if ($baseVersion -like "*-non-pprof") {
+            $Version = $baseVersion
+        } else {
+            $Version = "$baseVersion-non-pprof"
+        }
     }
     if (-not $Revision) {
         $Revision = (& git -c "safe.directory=$repoRoot" rev-parse HEAD).Trim()
